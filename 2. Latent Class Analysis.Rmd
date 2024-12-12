@@ -1,0 +1,128 @@
+---
+title: "2. Latent Class Analysis"
+author: "Hannah Lee"
+date: "2024-07-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(poLCA)
+library(dplyr)
+library(tidyverse)
+library(data.table)
+library(writexl)
+```
+
+*Latent Class Analysis* Resources: <https://pop.princeton.edu/sites/g/files/toruqf496/files/documents/2020Jan_LatentClassAnalysis.pdf> <https://cran.r-project.org/web/packages/poLCA/poLCA.pdf>
+
+```{r}
+result.folder <- ("~/Library/CloudStorage/OneDrive-SharedLibraries-MassGeneralBrigham/Data Repository - Documents/Dataset Files/Mass Vital Statistics- Death Data/Analysis/Mortality Cluster Analysis/")
+# Read in the data
+dat = fread("C:\\Users\\HL522\\Mass General Brigham/Data Repository - Documents\\Dataset Files\\Mass Vital Statistics- Death Data\\Analysis\\Mortality Cluster Analysis\\MA_OD_rx.csv")
+dat <- dat %>%
+  dplyr::select(-V1)
+```
+
+```{r}
+# Run a model with the drug categories
+f1 <- as.formula(cbind(fentanyl_and_other_synthetic_opioids, heroin, other_opioids, cocaine, benzos, psychostimulants, alcohol, antidepressants, antipsychotics_and_neuroleptics, nonbenzo_antiepileptic_sedative_hypnotic_antiparkinsonism_drugs, other_and_unspecified_narcotics, other)~1)
+```
+
+Run LCA for multiple classes
+
+```{r}
+# Number of classes to iterate over
+num_classes <- 2:7
+
+# Initialize a list to store the results
+results <- list()
+models <- list()
+
+# Loop through the number of classes
+for (k in num_classes) {
+  # The poLCA model
+  LCA_model <- poLCA(f1, data=dat, nclass=k, tol = 1e-10, maxiter = 1000000, nrep = 15, graphs = TRUE)
+  models[[paste("LCA_model", k, sep = "_")]] <- list(
+    model = LCA_model,
+    predclass = LCA_model$predclass
+  )
+
+  # Initialize a list to store Pr(2) values for each variable
+  Pr2_values <- list()
+  
+  # Extract the Pr(2) values for each category variable
+  for (variable in names(LCA_model$probs)) {
+    prob_matrix <- LCA_model$probs[[variable]]
+    if (nrow(prob_matrix) >= 2) { 
+      Pr2_values[[variable]] <- prob_matrix[, 2]
+    } else {
+      Pr2_values[[variable]] <- rep(NA, k)  
+    }
+  }
+  
+  # Convert the list of Pr(2) values to a data frame
+  Pr2_df <- do.call(cbind, Pr2_values)
+  
+  # Assign row names to the data frame
+  rownames(Pr2_df) <- paste("Class", 1:k, sep = "_")
+  
+  # Transpose the data frame
+  Pr2_df <- t(Pr2_df)
+  Pr2_df <- as.data.frame(round(Pr2_df, 3))
+  
+  # Add variable names as a column
+  Pr2_df <- cbind(Variable = rownames(Pr2_df), Pr2_df)
+  rownames(Pr2_df) <- NULL
+  
+  # Add the estimated class shares at the bottom of the data frame
+  class_shares <- as.data.frame(t(round(LCA_model$P, 3)))
+  colnames(class_shares) <- paste("Class", 1:k, sep = "_")
+  class_shares <- cbind(Variable = "Class Share", class_shares)
+  
+  # Combine Pr2 values and class shares
+  Pr2_df <- rbind(Pr2_df, class_shares)
+  
+  # Store the data frame in the results list
+  results[[paste("LCA", k, sep = "_")]] <- Pr2_df
+}
+
+# Write the results to an Excel file with each data frame in a separate sheet
+write_xlsx(results, path = "LCA_results.xlsx")
+
+# Save LCA results
+saveRDS(models, file = "LCA_models.rds")
+```
+
+```{r}
+models <- readRDS("C:\\Users\\HL522\\Mass General Brigham/Data Repository - Documents\\Dataset Files\\Mass Vital Statistics- Death Data\\Analysis\\Mortality Cluster Analysis\\LCA_models.rds")
+```
+
+We chose the 5-class model.
+```{r}
+# Add class assignments to the data frame
+dat$Class5 <- models[["LCA_model_5"]]$predclass
+
+dat <- dat %>%
+  mutate(
+    nonbenzo_antiepileptic_sedative_hypnotic_antiparkinsonism_drugs = if_else(nonbenzo_antiepileptic_sedative_hypnotic_antiparkinsonism_drugs == 2, 1, 0),
+    other_and_unspecified_narcotics = if_else(other_and_unspecified_narcotics == 2, 1, 0),
+    fentanyl_and_other_synthetic_opioids = if_else(fentanyl_and_other_synthetic_opioids == 2, 1, 0),
+    heroin = if_else(heroin == 2, 1, 0),
+    other_opioids = if_else(other_opioids == 2, 1, 0),
+    cocaine = if_else(cocaine == 2, 1, 0),
+    benzos = if_else(benzos == 2,1,0),
+    psychostimulants = if_else(psychostimulants == 2, 1, 0),
+    alcohol = if_else(alcohol == 2, 1, 0),
+    antidepressants = if_else(antidepressants == 2, 1, 0),
+    antipsychotics_and_neuroleptics = if_else(antipsychotics_and_neuroleptics == 2, 1, 0),
+    other = if_else(other == 2,1,0),
+    skeletal_muscle_relaxants = if_else(skeletal_muscle_relaxants == 2,1,0),
+  )
+```
+
+Save data
+```{r}
+file.name <- paste0(result.folder, "MA_OD_rx_with_classes.csv")
+write.csv(df, file.name, row.names = TRUE)
+```

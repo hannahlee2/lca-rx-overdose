@@ -1,0 +1,114 @@
+---
+title: "3. Multinomial Logistic Regression"
+author: "Hannah Lee"
+date: "2024-08-31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(nnet)
+library(dplyr)
+```
+
+```{r}
+dat = fread("C:\\Users\\HL522\\Mass General Brigham/Data Repository - Documents\\Dataset Files\\Mass Vital Statistics- Death Data\\Analysis\\Mortality Cluster Analysis\\MA_OD_rx_with_classes.csv")
+
+# Sample restriction
+df <- dat %>%
+    filter(EDUCATION != "Other" & YOD >= 2010)
+```
+
+Modify reference groups for multinomial logistic regression (5-class model)
+```{r pressure, echo=FALSE}
+# Set desired reference groups
+df$Class5 <- as.factor(df$Class5)
+df$RACEGROUP <- factor(df$RACEGROUP)
+df$SEX <- factor(df$SEX)
+df$Rurality <- factor(df$Rurality)
+df$AGEGROUP <- factor(df$AGEGROUP)
+df$EDUCATION <- factor(df$EDUCATION)
+df$MARITAL_STATUS <- factor(df$MARITAL_STATUS)
+df$POD <- factor(df$POD)
+
+
+df$Class5 <- factor(df$Class5, levels = c(2, 1, 3, 4, 5))
+df$RACEGROUP <- relevel(df$RACEGROUP, ref = "White NH")
+df$AGEGROUP <- relevel(df$AGEGROUP, ref = "Under 30")
+df$SEX <- relevel(df$SEX, ref = "M")  
+df$Rurality <- relevel(df$Rurality, ref = "Urban")  
+df$EDUCATION <- relevel(df$EDUCATION, ref = "High school or less")  
+df$MARITAL_STATUS <- relevel(df$MARITAL_STATUS, ref = "Not Married")  
+df$POD <- relevel(df$POD, ref = "Other")  
+```
+
+Bivariable multinomial logistic regression
+```{r}
+predictors <- c("SEX", "AGEGROUP", "RACEGROUP", "MARITAL_STATUS", "EDUCATION", "POD", "Rurality", "YOD")
+
+# Initialize an empty data frame to store the results
+odds_ratio_table <- data.frame()
+
+# Loop through each predictor
+for (var in predictors) {
+  formula <- as.formula(paste("Class5 ~", var))  # Create the formula
+  
+  # Fit the multinomial logistic regression model
+  model <- multinom(formula, data = df)
+  model_summary <- summary(model)
+  
+  # Extract coefficients
+  coefficients <- coef(model)
+  
+  # Compute odds ratios (by exponentiating the coefficients)
+  odds_ratios <- exp(coefficients)
+  
+  # Compute standard errors
+  std_errors <- model_summary$standard.errors
+  
+  # Calculate confidence intervals (95%)
+  ci_lower <- exp(coefficients - 1.96 * std_errors)
+  ci_upper <- exp(coefficients + 1.96 * std_errors)
+  
+  # Extract p-values (Wald test)
+  z_values <- coefficients / std_errors
+  p_values <- 2 * (1 - pnorm(abs(z_values)))
+  
+  # Organize results into a data frame
+  results <- data.frame(
+    Predictor = var,
+    Class = rownames(odds_ratios),
+    Odds_Ratio = round(odds_ratios, 2),
+    CI_Lower = round(ci_lower, 2),
+    CI_Upper = round(ci_upper, 2),
+    P_Value = round(p_values, 4)
+  )
+  
+  odds_ratio_table <- bind_rows(odds_ratio_table, results)
+}
+```
+
+
+Multivariable multinomial logistic regression
+```{r}
+model <- multinom(Class5 ~ AGEGROUP + SEX + RACEGROUP + Rurality + EDUCATION + MARITAL_STATUS + POD + YOD, data = df)
+
+coefficients <- summary(model)$coefficients
+
+# Exponentiate coefficients to obtain odds ratios
+odds_ratios <- round(exp(coefficients),2)
+odds_ratios
+
+standard_errors <- summary(model)$standard.errors
+
+# Obtain 95% confidence intervals
+lower_ci <- round(exp(coefficients - 1.96 * standard_errors), 2)
+upper_ci <- round(exp(coefficients + 1.96 * standard_errors), 2)
+
+# Obtain p-values
+z_values <- coefficients / standard_errors
+p_values <- round((2 * pnorm(-abs(z_values))),4)
+
+odds_ratio_ci <- data.frame(Odds_Ratios = odds_ratios, Lower_CI = lower_ci, Upper_CI = upper_ci, P = p_values)
+odds_ratio_ci
+```

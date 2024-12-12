@@ -1,0 +1,165 @@
+---
+title: "1. Data Cleaning"
+authors: "Hannah Lee"
+date: "2024-05-10"
+output: html_document
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(RColorBrewer)
+library(readxl)
+
+# Read the data
+result.folder <- ("~/Library/CloudStorage/OneDrive-SharedLibraries-MassGeneralBrigham/Data Repository - Documents/Dataset Files/Mass Vital Statistics- Death Data/Analysis/Mortality Cluster Analysis/")
+MA_OD <- fread("/Users/Hannah/Documents/R/Mass-Vital-Statistics/MA_OD.csv", header = TRUE, check.names = TRUE)
+```
+
+We will use MA_OD, the cleaned and merged MA Vital Stats data from 2000-2023
+Since ICD-10 codes and the literal text columns are critical to this analysis, we will clean and analyze it thoroughly. 
+
+```{r Clean up ICD codes}
+# Reformat the other causes of death
+# General categories are three characters, subcategories are four characters
+# https://www.cms.gov/Medicare/Coding/ICD10/Downloads/2019-ICD10-Coding-Guidelines-.pdf
+MA_OD$TRX_REC_AXIS_CD <- gsub("\u00A0", "", MA_OD$TRX_REC_AXIS_CD)
+MA_OD$TRX_REC_AXIS_CD <- sapply(MA_OD$TRX_REC_AXIS_CD, function(x) {
+  x <- gsub("^\\s+", "", x)
+
+  # Split the string by any number of spaces
+  split_string <- unlist(strsplit(x, "\\s+"))
+
+  # Remove leading and trailing whitespace
+  split_string <- trimws(split_string)
+  # Remove empty strings
+  split_string <- split_string[split_string != ""]
+})
+```
+
+Define drug categories
+``` {r icd_codes, include=FALSE}
+# Drug overdose deaths are identified using underlying cause of death codes X40-X44, X60-X64, X85, and Y10-Y14
+# https://www.cdc.gov/nchs/nvss/vsrr/drug-overdose-data.htm#:~:text=Drug%20overdose%20deaths%20are%20identified,X85%2C%20and%20Y10%E2%80%93Y14.
+
+# Mortality Cluster Analysis ICD Code Groups
+fentanyl_and_other_synthetic_opioids <- "T404"
+heroin <- "T401"
+other_opioids <- "T402|T403"
+cocaine <- "T405"
+benzos <- "T424"
+psychostimulants <- "T436"
+alcohol <-  "T510|T511|T512|T513|T518|T519"
+antidepressants <- "T430|T431|T432"
+antipsychotics_and_neuroleptics <- "T433|T434|T435"
+nonbenzo_antiepileptic_sedative_hypnotic_antiparkinsonism_drugs <- "T420|T421|T422|T423|T425|T426|T427|T428"
+skeletal_muscle_relaxants <- "T481|T482"
+other_and_unspecified_narcotics <- "T406"
+# Creating an 'other' drug category
+excluded_t_codes <- c("T404", "T401", "T402", "T403", "T405", "T424", "T436", "T430", "T431", "T432", "T433", "T434", "T435", "T420", "T421", "T422", "T423", "T425", "T426", "T427", "T428", "T406")
+full_range <- paste0("T", 360:508)
+filtered_codes <- setdiff(full_range, excluded_t_codes)
+other <- paste(filtered_codes, collapse = "|")
+```
+
+```{r classify_drugs}
+ODs_classified <- MA_OD
+
+ODs_classified <- ODs_classified %>%
+  mutate(
+    other_and_unspecified_narcotics = case_when(grepl(other_and_unspecified_narcotics, TRX_REC_AXIS_CD) ~ 2,
+                         TRUE ~ 1),
+    fentanyl_and_other_synthetic_opioids = case_when(grepl(fentanyl_and_other_synthetic_opioids, TRX_REC_AXIS_CD) ~ 2,
+                         TRUE ~ 1),
+    heroin = case_when(grepl(heroin, TRX_REC_AXIS_CD) ~ 2,
+                       TRUE ~ 1),    
+    other_opioids = case_when(grepl(other_opioids, TRX_REC_AXIS_CD) ~ 2,
+                      TRUE ~ 1),
+    cocaine = case_when(grepl(cocaine, TRX_REC_AXIS_CD) ~ 2,
+                        TRUE ~ 1),
+    benzos = case_when(grepl(benzos, TRX_REC_AXIS_CD) ~ 2,
+                                 TRUE ~ 1),
+    psychostimulants = case_when(grepl(psychostimulants, TRX_REC_AXIS_CD) ~ 2,
+                       TRUE ~ 1),
+    alcohol = case_when(grepl(alcohol, TRX_REC_AXIS_CD) ~ 2,
+                       TRUE ~ 1),    
+    antidepressants = case_when(grepl(antidepressants, TRX_REC_AXIS_CD) ~ 2,
+                       TRUE ~ 1),
+    antipsychotics_and_neuroleptics = case_when(grepl(antipsychotics_and_neuroleptics, TRX_REC_AXIS_CD) ~ 2,
+                                                TRUE ~ 1),
+    nonbenzo_antiepileptic_sedative_hypnotic_antiparkinsonism_drugs = case_when(grepl(nonbenzo_antiepileptic_sedative_hypnotic_antiparkinsonism_drugs, TRX_REC_AXIS_CD) ~ 2,
+                        TRUE ~ 1),
+    other = case_when(grepl(other, TRX_REC_AXIS_CD) ~ 2,
+                       TRUE ~ 1),
+    skeletal_muscle_relaxants = case_when(grepl(skeletal_muscle_relaxants, TRX_REC_AXIS_CD) ~ 2,
+                       TRUE ~ 1),
+  )
+
+# Sample of overdoses involving prescription drugs
+MA_OD_rx <-  ODs_classified %>%
+  filter(benzos == 2 | nonbenzo_antiepileptic_sedative_hypnotic_antiparkinsonism_drugs == 2 | antidepressants == 2 | antipsychotics_and_neuroleptics == 2 | skeletal_muscle_relaxants == 2) 
+MA_OD_rx$TRX_REC_AXIS_CD <- sapply(MA_OD_rx$TRX_REC_AXIS_CD, toString)
+```
+
+Clean variables
+```{r}
+df <- MA_OD_rx 
+
+df$MARITAL_STATUS <- ifelse(!is.na(df$marital_status), df$marital_status, df$MARITAL)
+
+df <- df %>%
+  mutate(EDUCATION = case_when(
+    (education >= 0 & education <= 12) | (DEDUC == 1 |DEDUC == 2 |DEDUC == 3)  ~ "High school or less",
+    (education >= 13 & education <= 17) | (DEDUC >= 4 & DEDUC <= 9) ~ "Some college",
+    TRUE ~ "Other"
+  ))
+
+df <- df %>%
+  mutate(POD = case_when(
+    (type_of_place_where_death_occurred == 6) | (DPLACE == 4)  ~ "Residence",
+    TRUE ~ "Other"
+  ))
+
+keep_race <- c("White NH", "Black NH", "Hispanic")
+df$RACEGROUP <- ifelse(df$RACEGROUP %in% keep_race, df$RACEGROUP, "Other NH")
+
+# Remove entries without age (one entry)
+df <- df %>% filter(AGE1_CALC != 999)
+df$AGEGROUP <- cut(df$AGE1_CALC,
+                    breaks = c(-Inf, 29, 44, 59, Inf),
+                    labels = c("Under 30", "30 to 44", "45 to 59", "60 and older"),
+                    right = TRUE)
+
+df$MARITAL_STATUS <- ifelse(df$MARITAL_STATUS == "M" | df$MARITAL_STATUS == "A" | df$MARITAL_STATUS == 2, "Married", "Not Married")
+
+```
+
+
+Add variable for rural/urban based on county 
+```{r}
+# This excel sheet was modified by an addition of a rurality column by city, provided by  https://www.mass.gov/info-details/state-office-of-rural-health-rural-definition 
+rurality <- read_excel("~/Library/CloudStorage/OneDrive-SharedLibraries-MassGeneralBrigham/Data Repository - Documents/Dataset Files/Mass Vital Statistics- Death Data/Analysis/Mortality Cluster Analysis/2022-CHIA-Zip-Code-List.xlsx")
+rurality <- rurality %>%
+  dplyr::select(DNAME_CITY, Rurality) %>%
+  distinct()
+rurality$DNAME_CITY <- toupper(rurality$DNAME_CITY)
+
+# Certain cities have inconsistent spellings, so we will clean this first
+city_names <- c(`MANCHESTER-BY-THE-SEA` = "MANCHESTER BY THE SEA", MARLBORO = "MARLBOROUGH", MIDDLEBORO = "MIDDLEBOROUGH", `N ATTLEBORO` = "NORTH ATTLEBOROUGH", `NORTH ATTLEBORO` = "NORTH ATTLEBOROUGH", `NORTH FALMOUTH` = "FALMOUTH", NORTHBORO = "NORTHBOROUGH", `S HADLEY` = "SOUTH HADLEY", TYNGSBORO = "TYNGSBOROUGH", `W BOYLSTON` = "WEST BOYLSTON", `W BRIDGEWATER` = "WEST BRIDGEWATER", `W BROOKFIELD` = "WEST BROOKFIELD", `W SPRINGFIELD` = "WEST SPRINGFIELD", `LANESBORO` = "LANESBOROUGH")
+df$DNAME_CITY  <- ifelse(is.na(city_names[match(df$DNAME_CITY , names(city_names))]),
+                         df$DNAME_CITY ,
+                         city_names[match(df$DNAME_CITY , names(city_names))])
+
+df <- merge(df, rurality, by = "DNAME_CITY", all.x = TRUE)
+```
+
+
+Save data
+```{r}
+df <- df[order(df$DOD_4_FD),]
+file.name <- paste0(result.folder, "MA_OD_rx.csv")
+write.csv(df, file.name, row.names = TRUE)
+```
