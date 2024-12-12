@@ -15,7 +15,6 @@ library(data.table)
 ```
 
 ``` {r}
-result.folder <- ("C:\\Users\\HL522\\Mass General Brigham\\Data Repository - Documents\\Dataset Files\\Mass Vital Statistics- Death Data\\Analysis\\Mortality Cluster Analysis\\")
 dat = fread("C:\\Users\\HL522\\Mass General Brigham\\Data Repository - Documents\\Dataset Files\\Mass Vital Statistics- Death Data\\Analysis\\Mortality Cluster Analysis\\MA_OD_rx_with_classes.csv")
 ```
 
@@ -166,9 +165,6 @@ df_cleaned <- temp %>%
       literal_text
     )
   )
-MA_OD_rx_literal_text <- df_cleaned
-file.name <- paste0(result.folder, "MA_OD_rx_literal_text.xlsx")
-write_xlsx(MA_OD_rx_literal_text, file.name)
 ```
 
 ```{r}
