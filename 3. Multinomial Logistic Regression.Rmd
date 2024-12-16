@@ -9,14 +9,16 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(nnet)
 library(dplyr)
+library(data.table)
+
 ```
 
 ```{r}
-dat = fread("C:\\Users\\HL522\\Mass General Brigham/Data Repository - Documents\\Dataset Files\\Mass Vital Statistics- Death Data\\Analysis\\Mortality Cluster Analysis\\MA_OD_rx_with_classes.csv")
+dat = fread("C:\\Users\\HL522\\Mass General Brigham\\Data Repository - Documents\\Analyses\\Mass Vital Statistics - Death Data\\Mass Rx Drugs LCA\\MA_OD_rx_with_classes.csv")
 
 # Sample restriction
 df <- dat %>%
-    filter(EDUCATION != "Other" & YOD >= 2010)
+    filter(EDUCATION != "Other")
 ```
 
 Modify reference groups for multinomial logistic regression (5-class model)
