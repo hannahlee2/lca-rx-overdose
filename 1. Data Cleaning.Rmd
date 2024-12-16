@@ -11,9 +11,10 @@ knitr::opts_chunk$set(echo = TRUE)
 library(data.table)
 library(dplyr)
 library(ggplot2)
-library(RColorBrewer)
 library(readxl)
+```
 
+``` {r}
 # Read the data
 result.folder <- ("~/Library/CloudStorage/OneDrive-SharedLibraries-MassGeneralBrigham/Data Repository - Documents/Dataset Files/Mass Vital Statistics- Death Data/Analysis/Mortality Cluster Analysis/")
 MA_OD <- fread("/Users/Hannah/Documents/R/Mass-Vital-Statistics/MA_OD.csv", header = TRUE, check.names = TRUE)
@@ -138,7 +139,7 @@ df$MARITAL_STATUS <- ifelse(df$MARITAL_STATUS == "M" | df$MARITAL_STATUS == "A" 
 ```
 
 
-Add variable for rural/urban based on county 
+Add variable for rural/non-rural
 ```{r}
 # This excel sheet was modified by an addition of a rurality column by city, provided by  https://www.mass.gov/info-details/state-office-of-rural-health-rural-definition 
 rurality <- read_excel("~/Library/CloudStorage/OneDrive-SharedLibraries-MassGeneralBrigham/Data Repository - Documents/Dataset Files/Mass Vital Statistics- Death Data/Analysis/Mortality Cluster Analysis/2022-CHIA-Zip-Code-List.xlsx")
