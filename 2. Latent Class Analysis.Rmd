@@ -1,7 +1,5 @@
 ---
 title: "2. Latent Class Analysis"
-author: "Hannah Lee"
-date: "2024-07-11"
 output: html_document
 ---
 
@@ -17,11 +15,9 @@ library(writexl)
 *Latent Class Analysis* Resources: <https://pop.princeton.edu/sites/g/files/toruqf496/files/documents/2020Jan_LatentClassAnalysis.pdf> <https://cran.r-project.org/web/packages/poLCA/poLCA.pdf>
 
 ```{r}
-result.folder <- ("~/Library/CloudStorage/OneDrive-SharedLibraries-MassGeneralBrigham/Data Repository - Documents/Dataset Files/Mass Vital Statistics- Death Data/Analysis/Mortality Cluster Analysis/")
+result.folder <- ("file path")
 # Read in the data
-dat = fread("C:\\Users\\HL522\\Mass General Brigham/Data Repository - Documents\\Dataset Files\\Mass Vital Statistics- Death Data\\Analysis\\Mortality Cluster Analysis\\MA_OD_rx.csv")
-dat <- dat %>%
-  dplyr::select(-V1)
+dat = fread("file path")
 ```
 
 ```{r}
@@ -95,7 +91,7 @@ saveRDS(models, file = "LCA_models.rds")
 ```
 
 ```{r}
-models <- readRDS("C:\\Users\\HL522\\Mass General Brigham/Data Repository - Documents\\Dataset Files\\Mass Vital Statistics- Death Data\\Analysis\\Mortality Cluster Analysis\\LCA_models.rds")
+models <- readRDS("file path\\LCA_models.rds")
 ```
 
 We chose the 5-class model.
@@ -124,5 +120,5 @@ dat <- dat %>%
 Save data
 ```{r}
 file.name <- paste0(result.folder, "MA_OD_rx_with_classes.csv")
-write.csv(df, file.name, row.names = TRUE)
+write.csv(dat, file.name, row.names = TRUE)
 ```

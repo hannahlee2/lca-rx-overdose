@@ -1,0 +1,139 @@
+---
+title: "5. Visualizations"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(ggrepel)
+library(readxl)
+library(data.table)
+library(patchwork)
+```
+
+``` {r}
+dat <- fread("file path")
+```
+
+*Figure 1*
+```{r}
+total_counts_per_class_year <- dat %>%
+  group_by(Class5, YOD) %>%
+  summarise(TotalRows = n(), .groups = 'drop')
+
+
+plot <- ggplot(total_counts_per_class_year, aes(x = factor(YOD), y = TotalRows, fill = factor(Class5))) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(
+    x = "Year",
+    y = "Number of Deaths",
+    fill = NULL
+  ) +
+ scale_x_discrete(guide = guide_axis(angle = 90)) +
+scale_fill_discrete(labels = c("Class 1: Antidepressants", 
+                               "Class 2: Fentanyl, cocaine, and benzodiazepines", 
+                               "Class 3: Antidepressants and antipsychotics",  
+                               "Class 4: Prescription opioids and benzodiazepines", 
+                               "Class 5: Fentanyl and gabapentin or xylazine")) +
+  theme_minimal() +
+  theme(
+    axis.title = element_text(color = "black", size = 18), 
+    axis.text = element_text(color = "black", size = 18),
+    legend.text = element_text(color = "black", size = 18),
+    legend.position = "bottom",
+    axis.title.x = element_text(margin = margin(t = 15, b = 0, l = 0, r = 0)),
+    axis.title.y = element_text(margin = margin(t = 0, b = 0, l = 0, r = 15))
+  ) +
+  guides(fill = guide_legend(nrow = 2, byrow = TRUE))
+
+ggsave("deaths_by_class_year.svg", plot= plot, width = 18, height = 12, dpi = 1000)
+```
+
+*Supplementary Table 1*
+```{r}
+total_counts_per_class_year <- dat %>%
+  group_by(Class5, YOD) %>%
+  summarise(TotalRows = n(), .groups = 'drop') %>%
+  pivot_wider(names_from = Class5, values_from = TotalRows, values_fill = list(TotalRows = 0))
+```
+
+
+*Figure 2. Rank Plot (Literal Text)* 
+
+```{r}
+analyze_df <- dat %>%
+  dplyr::select(Class5, literal_text_cleaned, DOD_4_FD, YOD) %>%
+  filter(!is.na(literal_text_cleaned))
+
+analyze_df_split <- analyze_df %>%
+  separate_rows(literal_text_cleaned, sep = ",") %>%   # Split by comma
+  mutate(literal_text_cleaned = trimws(literal_text_cleaned))
+
+# Group by Year (YOD) and Class5, then count frequencies
+analyze_df_freq <- analyze_df_split %>%
+  group_by(YOD, literal_text_cleaned) %>%
+  summarise(frequency = n(), .groups = 'drop')
+```
+
+```{r}
+yearly_categories <- analyze_df_freq %>%
+  rename(Category = literal_text_cleaned) %>%
+  rename(Count = frequency) %>%
+  filter(Category != "4-ANPP" & Category != "ACETYL FENTANYL" & Category != "HEROIN" & Category != "BENZODIAZEPINE" & Category != "FENTANYL" & Category != "ETHANOL" & Category != "OPIATE" & Category != "COCAINE")
+
+# Create a rank column within each year
+yearly_categories_ranked <- yearly_categories %>%
+  group_by(YOD) %>%
+  arrange(desc(Count)) %>%
+  mutate(Rank = dense_rank(desc(Count))) %>%
+  ungroup()
+
+# Filter for the top ranks and handle previous_rank
+yearly_categories_ranked_new <- yearly_categories_ranked %>%
+  filter(Rank <= 5) %>%
+  arrange(YOD, Rank) %>%          # Ensures the data is sorted by year and rank
+  group_by(Category) %>%           # Groups the data by category for subsequent operations
+  mutate(
+    previous_rank = ifelse(
+      YOD == 2015, NA,            # Assigns NA to the first year in your data (adjust the year as needed)
+      ifelse(is.na(lag(Rank)), max(Rank) + 1, lag(Rank))  # Replaces NA in lag with the maximum rank plus one
+    )
+  )
+
+# Identify the first year each category appears
+first_appearance <- yearly_categories_ranked_new %>%
+  group_by(Category) %>%
+  filter(YOD == min(YOD))
+```
+
+Plot the rankings
+```{r  fig.width=20, fig.height=10}
+# Plot with adjusted colors and labels
+category_rank <- ggplot(yearly_categories_ranked_new, aes(x = YOD, y = Rank, group = Category)) +
+  geom_line(aes(color = Category), linewidth = 10, alpha = 0.4) +  # Very thick lines
+  geom_text_repel(data = first_appearance, 
+            aes(x = YOD, y = Rank, label = Category, fill = Category, color = Category),  # Matching label fill and text color
+            size = 4.5, fontface = "bold", nudge_y = 0.4, nudge_x = 0, box.padding = 0.2, 
+            max.overlaps = 5, force = 1, segment.color = NA) +  # Use custom fill color for background and matching text color
+  geom_label(aes(label = Count, fill = Category), color = "white", label.size = 0.3, size = 5, fontface = "bold",  alpha = 1) +  # Add Total_Count values with white text
+  scale_y_reverse(breaks = 1:20, labels = 1:20) + 
+  scale_x_continuous(breaks = seq(2015, 2023, by = 1), labels = seq(2015, 2023, by = 1)) +  # Fix year labels to display correctly
+  theme_minimal() +
+  labs(x = "Year", y = "Rank") +
+  theme(
+    legend.position = "none", 
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(),
+    text = element_text(size = 18), 
+    axis.text.x = element_text(size = 16),  # Increase size of x-axis labels (Year)
+    axis.text.y = element_text(size = 20),  # Increase size of y-axis labels (Rank)
+    axis.title.x = element_text(margin = margin(t = 10, unit = "pt")),
+    axis.title.y = element_text(margin = margin(r = 10, unit = "pt"))
+  )
+
+print(category_rank)
+
+ggsave("category_rank_literal_text.jpeg", plot = category_rank, width = 18, height = 10, dpi = 300)
+```

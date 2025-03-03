@@ -1,7 +1,5 @@
 ---
 title: "3. Multinomial Logistic Regression"
-author: "Hannah Lee"
-date: "2024-08-31"
 output: html_document
 ---
 
@@ -14,7 +12,7 @@ library(data.table)
 ```
 
 ```{r}
-dat = fread("C:\\Users\\HL522\\Mass General Brigham\\Data Repository - Documents\\Analyses\\Mass Vital Statistics - Death Data\\Mass Rx Drugs LCA\\MA_OD_rx_with_classes.csv")
+dat = fread("file path")
 
 # Sample restriction
 df <- dat %>%

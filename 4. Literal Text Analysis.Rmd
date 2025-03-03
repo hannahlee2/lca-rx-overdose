@@ -1,0 +1,100 @@
+---
+title: "4. Literal Text Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(dplyr)
+library(rcompanion)
+```
+
+Import data with manually cleaned literal text entries
+
+```{r}
+dat <- fread("file path")
+```
+
+Analyze class 5
+```{r}
+dat_classes_analyze <- dat %>% filter(Class5 == 5)
+
+dat_classes_analyze <- dat_classes_analyze %>%
+  mutate(fent_indicator = as.integer(grepl("FENTANYL", literal_text_cleaned)),
+        gaba_indicator = as.integer(grepl("GABAPENTIN", literal_text_cleaned)),
+         xylazine_indicator = as.integer(grepl("XYLAZINE", literal_text_cleaned)))
+
+dat_classes_analyze <- dat_classes_analyze %>%
+  mutate(subgroup = case_when(
+    fent_indicator == 1 & gaba_indicator == 1 & xylazine_indicator == 0  ~ "Fentanyl + Gabapentin",
+    fent_indicator == 1 & gaba_indicator == 0 & xylazine_indicator == 1  ~ "Fentanyl + Xylazine",
+    TRUE ~ "Other Combinations"
+  ))
+```
+
+Summary statistics
+```{r}
+dat_classes_analyze %>%
+  group_by(subgroup) %>%
+  summarise(
+    Average_Age = mean(AGE1_CALC, na.rm = TRUE),
+    Age_SD = sd(AGE1_CALC, na.rm = TRUE),
+    Count = n(),
+    Sex_Distribution = paste(names(table(SEX)), table(SEX), sep=": ", collapse=", "),
+    Race_Distribution = paste(names(table(RACEGROUP)), table(RACEGROUP), sep=": ", collapse=", "),
+    Age_Distribution = paste(names(table(AGEGROUP)), table(AGEGROUP), sep=": ", collapse=", ")
+  )
+```
+
+*Chi-squared tests*
+```{r}
+# Filter the dataset for the two specific subgroups
+filtered_data <- dat_classes_analyze %>%
+  filter(subgroup %in% c("Fentanyl + Gabapentin", "Fentanyl + Xylazine"))
+```
+
+Race
+``` {r}
+race_table <- table(filtered_data$subgroup, filtered_data$RACEGROUP)
+
+# Calculate Chi-square test and get the residuals
+chi_sq_test <- chisq.test(race_table)
+print(chi_sq_test)
+std_residuals <- chi_sq_test$stdres
+print(std_residuals)
+
+# Identify significant cells
+significant_cells <- abs(std_residuals) > 1.96
+print(significant_cells)
+```
+
+Age
+``` {r}
+age_table <- table(filtered_data$subgroup, filtered_data$AGEGROUP)
+
+# Calculate Chi-square test and get the residuals
+chi_sq_test <- chisq.test(age_table)
+print(chi_sq_test)
+std_residuals <- chi_sq_test$stdres
+print(std_residuals)
+
+# Identify significant cells
+significant_cells <- abs(std_residuals) > 1.96
+print(significant_cells)
+```
+
+Sex
+``` {r}
+sex_table <- table(filtered_data$subgroup, filtered_data$SEX)
+
+# Calculate Chi-square test and get the residuals
+chi_sq_test <- chisq.test(sex_table, correct = FALSE)
+print(chi_sq_test)
+std_residuals <- chi_sq_test$stdres
+print(std_residuals)
+
+# Identify significant cells
+significant_cells <- abs(std_residuals) > 1.96
+print(significant_cells)
+```

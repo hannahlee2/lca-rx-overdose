@@ -1,7 +1,5 @@
 ---
 title: "1. Data Cleaning"
-authors: "Hannah Lee"
-date: "2024-05-10"
 output: html_document
 
 ---
@@ -16,8 +14,8 @@ library(readxl)
 
 ``` {r}
 # Read the data
-result.folder <- ("~/Library/CloudStorage/OneDrive-SharedLibraries-MassGeneralBrigham/Data Repository - Documents/Dataset Files/Mass Vital Statistics- Death Data/Analysis/Mortality Cluster Analysis/")
-MA_OD <- fread("/Users/Hannah/Documents/R/Mass-Vital-Statistics/MA_OD.csv", header = TRUE, check.names = TRUE)
+result.folder <- ("file path")
+MA_OD <- fread("file path", header = TRUE, check.names = TRUE)
 ```
 
 We will use MA_OD, the cleaned and merged MA Vital Stats data from 2000-2023
@@ -25,8 +23,6 @@ Since ICD-10 codes and the literal text columns are critical to this analysis, w
 
 ```{r Clean up ICD codes}
 # Reformat the other causes of death
-# General categories are three characters, subcategories are four characters
-# https://www.cms.gov/Medicare/Coding/ICD10/Downloads/2019-ICD10-Coding-Guidelines-.pdf
 MA_OD$TRX_REC_AXIS_CD <- gsub("\u00A0", "", MA_OD$TRX_REC_AXIS_CD)
 MA_OD$TRX_REC_AXIS_CD <- sapply(MA_OD$TRX_REC_AXIS_CD, function(x) {
   x <- gsub("^\\s+", "", x)
@@ -46,7 +42,7 @@ Define drug categories
 # Drug overdose deaths are identified using underlying cause of death codes X40-X44, X60-X64, X85, and Y10-Y14
 # https://www.cdc.gov/nchs/nvss/vsrr/drug-overdose-data.htm#:~:text=Drug%20overdose%20deaths%20are%20identified,X85%2C%20and%20Y10%E2%80%93Y14.
 
-# Mortality Cluster Analysis ICD Code Groups
+# ICD Code Groups
 fentanyl_and_other_synthetic_opioids <- "T404"
 heroin <- "T401"
 other_opioids <- "T402|T403"
